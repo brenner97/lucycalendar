@@ -1,0 +1,271 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div id="dialog-confirm" title="Termin löschen?" style="display:none;">
+    <p>Termin löschen?</p>
+</div>
+<div id="dialog-name" title="Name fehlt" style="display:none;">
+    <p>Name fehlt</p>
+</div>
+<div id="dialog-edit" title="Bearbeiten" style="display:none;">
+    <p>Termine bearbeiten</p>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="btn-toolbar mb-3" role="toolbar" aria-label="Toolbar with button groups">
+
+                <div class="input-group">
+                    <input type="text" id="name" class="form-control" placeholder="Name" aria-label="Name" aria-describedby="btnGroupAddon">
+                    <div class="input-group-append">
+                        <button id="save" type="button" class="btn btn-danger">Speichern</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Termin eingabe</h1>
+        </div>
+        <div class="col-md-12">
+
+            <div id="calendar"></div>
+
+        </div>
+    </div>
+    <hr />
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Termin auswertung</h1>
+        </div>
+        <div class="col-md-12">
+
+            <div id="auswertung"></div>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+
+    <script>
+
+        function isNullOrWhitespace(input) {
+
+            if (input == null) return true;
+
+            return input.replace(/\s/gi, '').length < 1;
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+
+            var color;
+
+            var calendarEl = document.getElementById('calendar');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'timeGridWeek',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'timeGridWeek,timeGridDay'
+                },
+                slotMinTime: '15:00:00',
+                slotDuration: '00:30:00',
+                allDaySlot: false,
+                height: 'auto',
+                locale: 'de',
+                //slotMaxTime: '24:00:00',
+                firstDay: '1',
+                validRange: {
+                    start: '2020-09-14',
+                    end: '2020-09-21'
+                },
+                selectable: true,
+
+                select: function (info) {
+
+                    var name = $("#name").val();
+
+                    if (isNullOrWhitespace(name)) {
+                        $("#dialog-name").dialog();
+                        return;
+                    }
+
+
+                    var start = new Date(info.startStr);
+                    var end = new Date(info.endStr);
+
+                    if (start.getDate() != end.getDate()) {
+                        end = new Date(info.startStr);
+                        end.setHours(24);
+                        end.setMinutes(00);
+                    }
+
+                    if (color == null) {
+                        color = "#" + Math.floor(Math.random() * (255 - 0) + 0).toString(16) +
+                            Math.floor(Math.random() * (255 - 0) + 0).toString(16) +
+                            Math.floor(Math.random() * (255 - 0) + 0).toString(16);
+                    }
+
+                    var create = { // this object will be "parsed" into an Event Object
+                        title: name, // a property!
+                        start: info.startStr, // a property!
+                        end: end.toISOString(), // a property! ** see important note below about 'end' **
+                        color: color
+                    }
+                    calendar.addEvent(create);
+                },
+
+                eventClick: function (info) {
+
+                    $("#dialog-confirm").dialog({
+                        resizable: false,
+                        height: "auto",
+                        width: 400,
+                        modal: true,
+                        buttons: {
+                            "Löschen": function () {
+                                $.ajax({
+                                    type: "POST",
+                                    url: "@Url.Action("Delete", "Home")",
+                                    data: JSON.stringify(info.event),
+                                    success: function (data, textStatus, jqxhr) {
+                                        info.event.remove();
+
+                                        auswertung.refetchEvents();
+                                        
+                                    },
+                                    dataType: "json"
+                                });
+
+
+
+                                $(this).dialog("close");
+                            },
+                            "Abbruch": function () {
+                                $(this).dialog("close");
+                            }
+                        }
+                    });
+
+                },
+
+                //initialDate: '2020-09-12',
+                weekNumbers: true,
+                navLinks: true, // can click day/week names to navigate views
+                editable: true,
+                nowIndicator: true,
+                dayMaxEvents: true,
+
+            });
+            calendar.render();
+
+
+            var auswertungEl = document.getElementById('auswertung');
+            var auswertung = new FullCalendar.Calendar(auswertungEl, {
+                initialView: 'timeGridWeek',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'timeGridWeek,timeGridDay'
+                },
+                slotMinTime: '15:00:00',
+                slotDuration: '00:30:00',
+                allDaySlot: false,
+                height: 'auto',
+                locale: 'de',
+                //slotMaxTime: '24:00:00',
+                firstDay: '1',
+                validRange: {
+                    start: '2020-09-14',
+                    end: '2020-09-21'
+                },
+                selectable: false,
+                events: "@Url.Action("Get", "Home")",
+
+
+                eventClick: function (info) {
+                    $("#dialog-edit").dialog({
+                        resizable: false,
+                        height: "auto",
+                        width: 400,
+                        modal: true,
+                        buttons: {
+                            "ja": function () {
+                                calendar.getEvents().forEach(function (item) {
+                                    item.remove();
+                                });
+
+
+
+                                auswertung.getEvents().forEach(function (item) {
+
+                                    if (info.event.title == item.title) {
+                                        calendar.addEvent(item);
+                                        $("#name").val(item.title);
+                                        color = item.backgroundColor;
+                                    }
+                                }.bind(this));
+
+                                $(this).dialog("close");
+                            },
+                            "Nein": function () {
+                                $(this).dialog("close");
+                            }
+                        }
+                    });
+                },
+
+                //initialDate: '2020-09-12',
+                weekNumbers: true,
+                navLinks: true, // can click day/week names to navigate views
+                editable: false,
+                nowIndicator: true,
+                dayMaxEvents: true,
+
+            });
+            auswertung.render();
+
+
+
+
+
+
+
+
+
+            $("#name").keyup(function (e) {
+                var val = $(e.target).val();
+
+                calendar.getEvents().forEach(function (item) {
+                    item.setProp("title", val);
+                });
+            });
+
+            $("#save").click(function (e) {
+                auswertung.getEvents().forEach(function (item) {
+                    item.remove();
+                });
+
+                $.ajax({
+                    type: "POST",
+                    url: "@Url.Action("Add", "Home")",
+                    data: JSON.stringify(calendar.getEvents()),
+                    success: function (data, textStatus, jqxhr) {
+                        calendar.getEvents().forEach(function (item) {
+                            item.remove();
+                        });
+
+                        auswertung.refetchEvents();
+                    },
+                    dataType: "json"
+                });
+            });
+        });
+
+    </script>
+}
