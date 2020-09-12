@@ -26,20 +26,6 @@ namespace LucyCalender.Controllers
             return View();
         }
 
-        public IActionResult Shutdown()
-        {
-            using (var reader = new StreamReader(Request.Body))
-            {
-                var body = reader.ReadToEndAsync().Result;
-
-                if (body != "2204038") {
-                    return Ok();
-                }
-                applicationLifetime.StopApplication();
-                return new EmptyResult();
-            }
-        }
-
         public IActionResult Privacy()
         {
             return View();
